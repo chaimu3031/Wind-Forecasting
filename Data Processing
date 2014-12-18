@@ -1,0 +1,167 @@
+Sub PPP_Data3_Populate()
+
+    Dim currYear, baseYear, i As Integer
+    
+    Application.ScreenUpdating = False
+    baseYear = ThisWorkbook.Worksheets("Inputs_Assumptions").Range("Input_CurrentYear").Value
+    
+    ' clear autofilter, filter for non-leap data
+    ThisWorkbook.Worksheets("PPP Data 2").Activate
+    ActiveSheet.Cells(1, 1).Select
+    If ActiveSheet.AutoFilterMode Then
+        Selection.AutoFilter
+    End If
+    Selection.AutoFilter
+    Selection.AutoFilter Field:=6, Criteria1:="0"
+    
+    'Paste forecast PPP for next 11 years, based on current year
+    For i = 1 To 11
+        currYear = baseYear + i - 1
+        Application.StatusBar = "Processing " & currYear
+        ThisWorkbook.Worksheets("PPP Data 2").Activate
+        Selection.AutoFilter Field:=2, Criteria1:=currYear
+        ActiveSheet.Cells(ActiveSheet.AutoFilter.Range.Offset(1).SpecialCells(xlCellTypeVisible).Row, ActiveSheet.Range("PPP_Data2_Header_PPP").Column).Select
+        Range(Selection, Selection.End(xlDown)).Select
+        Selection.Copy
+        ThisWorkbook.Worksheets("PPP Data 3").Activate
+        Range("PPP_Data3_Header_Yr" & i).Offset(1, 0).Select
+        Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks:=False, Transpose:=False
+    Next i
+    
+    ' clear autofilter
+    ThisWorkbook.Worksheets("PPP Data 2").Activate
+    ActiveSheet.Cells(1, 1).Select
+    If ActiveSheet.AutoFilterMode Then
+        Selection.AutoFilter
+    End If
+    
+    Application.StatusBar = ""
+    Application.CutCopyMode = False
+    Application.ScreenUpdating = True
+End Sub
+
+Sub Prod_Data3_Populate()
+
+    Dim currYear, startYear, lastDataYear, i As Integer
+    Dim DSTNovNumber, DSTMarNumber As Integer
+    Dim DSTNovValue As Double
+
+    ' Set Start and End Year
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    startYear = ThisWorkbook.Worksheets("Inputs_Assumptions").Range("Input_Year_FirstFullData").Value
+    lastDataYear = ThisWorkbook.Worksheets("Inputs_Assumptions").Range("Input_Year_LastFullData").Value
+    
+    ' Clear autofilter, filter for non-leap data
+    ThisWorkbook.Worksheets("Prod. Data 2").Activate
+    
+    ActiveSheet.Cells(1, 1).Select
+    If ActiveSheet.AutoFilterMode Then
+        Selection.AutoFilter
+    End If
+    Selection.AutoFilter
+    Selection.AutoFilter Field:=7, Criteria1:="0"
+    
+    'Paste Prodcution Data for selected range, based on current year
+    For i = 1 To (lastDataYear - startYear + 1)
+        currYear = startYear + i - 1
+        Application.StatusBar = "Processing " & currYear
+        ThisWorkbook.Worksheets("Prod. Data 2").Activate
+        Selection.AutoFilter Field:=2, Criteria1:=currYear
+        ActiveSheet.Cells(ActiveSheet.AutoFilter.Range.Offset(1).SpecialCells(xlCellTypeVisible).Row, ActiveSheet.Range("Prod_Data2_Header_MW").Column).Select
+        Range(Selection, Selection.End(xlDown)).Select
+        Selection.Copy
+        ThisWorkbook.Worksheets("Prod. Data 3").Activate
+        Range("Prod_Data3_Header_Yr" & i).Offset(1, 0).Select
+        Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks:=False, Transpose:=False
+        ActiveSheet.Range("Prod_Data3_Header_Yr1").Offset(0, i).Name = "Prod_Data3_Header_Yr" & (i + 1)
+        
+        If currYear >= 2010 Then
+            DSTMarNumber = CInt(Application.WorksheetFunction.VLookup(currYear, ThisWorkbook.Worksheets("Prod. Data 2").Range("DST_LookUp"), 4, False))
+            DSTNovNumber = CInt(Application.WorksheetFunction.VLookup(currYear, ThisWorkbook.Worksheets("Prod. Data 2").Range("DST_LookUp"), 5, False))
+            DSTNovValue = ActiveSheet.Range("Prod_Data3_Header_Yr" & i).Offset(DSTNovNumber, 0).Value
+            Range(Range("Prod_Data3_Header_Yr" & i).Offset(DSTMarNumber, 0), Range("Prod_Data3_Header_Yr" & i).Offset(DSTNovNumber - 1, 0)).Select
+            Selection.Copy
+            Selection.Offset(1, 0).PasteSpecial Paste:=xlPasteValues
+            Range("Prod_Data3_Header_Yr" & i).Offset(DSTMarNumber, 0) = DSTNovValue
+        End If
+    Next i
+    ' Delete extra name range
+    ActiveSheet.Range("Prod_Data3_Header_Yr" & i).Name.Delete
+    
+    ' Recalculate Production averages
+    Application.StatusBar = "Calculating Averages"
+    ActiveSheet.Range("Prod_Data3_Header_Avg").Offset(1, 0).Select
+    Selection.Formula = "=average(" & Range("Prod_Data3_Header_Yr1").Offset(1).Address(RowAbsolute:=False) _
+        & ":" & Range("Prod_Data3_Header_Yr" & (i - 1)).Offset(1).Address(RowAbsolute:=False) & ")"
+    Selection.Copy
+    Range(Selection.Offset(1, 0), Selection.End(xlDown)).Select
+    Selection.PasteSpecial Paste:=xlPasteFormulas, Operation:=xlNone, SkipBlanks:=False, Transpose:=False
+    Application.Calculate
+    Application.Calculation = xlCalculationAutomatic
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks:=False, Transpose:=False
+    
+    ' Clear autofilter
+    ThisWorkbook.Worksheets("Prod. Data 2").Activate
+    ActiveSheet.Cells(1, 1).Select
+    If ActiveSheet.AutoFilterMode Then
+        Selection.AutoFilter
+    End If
+    
+    Application.StatusBar = ""
+    Application.CutCopyMode = False
+    Application.ScreenUpdating = True
+End Sub
+
+Sub Macro5()
+'
+' Macro5 Macro
+'
+
+'
+    Range("E17546").Select
+End Sub
+
+
+Function checkChartSheet() As Boolean
+    checkChartSheet = False
+    If ActiveSheet.Name <> "Charts" Then
+        checkChartSheet = False
+    Else
+        checkChartSheet = True
+    End If
+End Function
+
+Sub UpdateNameRanges()
+    ThisWorkbook.Worksheets("Prod. Data 2").Activate
+    ThisWorkbook.Worksheets("Prod. Data 2").Range("A1:F1").Select
+    UpdateNameRangesSub
+    
+    ThisWorkbook.Worksheets("COGS Data 2").Activate
+    ThisWorkbook.Worksheets("COGS Data 2").Range("A1:C1").Select
+    UpdateNameRangesSub
+End Sub
+
+Sub UpdateNameRangesSub()
+    Application.ScreenUpdating = False
+    Dim oldName, newName As String
+    Dim rngSelection, rngCell As Range
+    
+    Set rngSelection = Application.Selection
+    
+    For Each cell In rngSelection
+        On Error GoTo ErrorHandler
+        oldName = cell.Name.Name
+        newName = Replace(oldName, "Header", "Data")
+        
+        Range(cell.Offset(1, 0), cell.End(xlDown)).Select
+        Selection.Name = newName
+    Next
+    Application.ScreenUpdating = True
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "Selection has no associated Name Range. Exiting.."
+End Sub
